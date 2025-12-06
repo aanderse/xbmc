@@ -7,6 +7,7 @@
  */
 
 #include "LinuxPowerSyscall.h"
+#include "CustomPowerSyscall.h"
 #include "FallbackPowerSyscall.h"
 #if defined(HAS_DBUS)
 #include "ConsoleUPowerSyscall.h"
@@ -35,7 +36,9 @@ IPowerSyscall* CLinuxPowerSyscall::CreateInstance()
     std::make_pair(CLogindUPowerSyscall::HasLogind,
                    [] { return new CLogindUPowerSyscall(); }),
     std::make_pair(CUPowerSyscall::HasUPower,
-                   [] { return new CUPowerSyscall(); })
+                   [] { return new CUPowerSyscall(); }),
+    std::make_pair(CCustomPowerSyscall::HasCustomCommands,
+                   [] { return new CCustomPowerSyscall(); })
   };
   for(const auto& powerManager : powerManagers)
   {
@@ -54,9 +57,13 @@ IPowerSyscall* CLinuxPowerSyscall::CreateInstance()
   }
   if (bestPowerManager)
     return bestPowerManager.release();
-  else
 #endif // HAS_DBUS
-    return new CFallbackPowerSyscall();
+
+  // Try CustomPowerSyscall as a fallback before the do-nothing FallbackPowerSyscall
+  if (CCustomPowerSyscall::HasCustomCommands())
+    return new CCustomPowerSyscall();
+
+  return new CFallbackPowerSyscall();
 }
 
 void CLinuxPowerSyscall::Register()
